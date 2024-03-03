@@ -15,9 +15,6 @@ FONT = ("Helvetica", 17)
 BUTTON_FONT = ("Helvetica", 15)
 SMALL_FONT = ("Helvetica", 13)
 
-# Creating a socket object
-# AF_INET: we are going to use IPv4 addresses
-# SOCK_STREAM: we are using TCP packets for communication
 client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
 def add_message(message):
@@ -26,35 +23,44 @@ def add_message(message):
     message_box.config(state=tk.DISABLED)
 
 def connect():
-
-    # try except block
     try:
-
-        # Connect to the server
         client.connect((HOST, PORT))
         print("Successfully connected to server")
         add_message("[SERVER] Successfully connected to the server")
-    except:
-        messagebox.showerror("Unable to connect to server", f"Unable to connect to server {HOST} {PORT}")
+    except Exception as e:
+        messagebox.showerror("Unable to connect to server", f"Unable to connect to server {HOST} {PORT}: {str(e)}")
+        return
 
     username = username_textbox.get()
-    if username != '':
-        client.sendall(username.encode())
-    else:
+    if not username:
         messagebox.showerror("Invalid username", "Username cannot be empty")
+        return
 
+    client.sendall(username.encode())
     threading.Thread(target=listen_for_messages_from_server, args=(client, )).start()
 
     username_textbox.config(state=tk.DISABLED)
     username_button.config(state=tk.DISABLED)
 
 def send_message():
-    message = message_textbox.get()
-    if message != '':
-        client.sendall(message.encode())
-        message_textbox.delete(0, len(message))
-    else:
-        messagebox.showerror("Empty message", "Message cannot be empty")
+    try:
+        message = message_textbox.get()
+        if message:
+            client.sendall(message.encode())
+            message_textbox.delete(0, tk.END)
+    except Exception as e:
+        print(f"Error sending message: {e}")
+
+def listen_for_messages_from_server(client):
+    while True:
+        try:
+            message = client.recv(2048).decode('utf-8')
+            if message:
+                username, content = message.split("~")
+                add_message(f"[{username}] {content}")
+        except Exception as e:
+            print(f"Error receiving message: {e}")
+            break
 
 root = tk.Tk()
 root.geometry("600x600")
@@ -93,25 +99,5 @@ message_box = scrolledtext.ScrolledText(middle_frame, font=SMALL_FONT, bg=MEDIUM
 message_box.config(state=tk.DISABLED)
 message_box.pack(side=tk.TOP)
 
-
-def listen_for_messages_from_server(client):
-
-    while 1:
-
-        message = client.recv(2048).decode('utf-8')
-        if message != '':
-            username = message.split("~")[0]
-            content = message.split('~')[1]
-
-            add_message(f"[{username}] {content}")
-            
-        else:
-            messagebox.showerror("Error", "Message recevied from client is empty")
-
-# main function
-def main():
-
-    root.mainloop()
-    
 if __name__ == '__main__':
-    main()
+    root.mainloop()
